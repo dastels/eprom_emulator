@@ -10,9 +10,9 @@ import digitalio
 import board
 import busio
 import adafruit_ssd1306
-import os
 import storage
 import adafruit_sdcard
+
 from directory_node import DirectoryNode
 from emulator import Emulator
 
