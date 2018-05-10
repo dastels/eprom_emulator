@@ -15,15 +15,13 @@ import adafruit_sdcard
 
 from directory_node import DirectoryNode
 from emulator import Emulator
-
+from debouncer import Debouncer
 
 #--------------------------------------------------------------------------------
 # Initialize Rotary encoder
 
 # Encoder button is a digital input with pullup on D2
-button = digitalio.DigitalInOut(board.D2)
-button.direction = digitalio.Direction.INPUT
-button.pull = digitalio.Pull.UP
+button = Debouncer(board.D2, digitalio.Pull.UP)
  
 # Rotary encoder inputs with pullup on D3 & D4
 rot_a = digitalio.DigitalInOut(board.D4)
@@ -188,18 +186,12 @@ while True:
         current_dir.down()
 
     # look for the initial edge of the rotary encoder switch press, with debouncing
-    first = button.value
-    time.sleep(0.01)
-    second = button.value
-    if first and not second:
-        while not button.value:
-            time.sleep(0.01)
+    button.update()
+    if button.fell:
         if current_mode == ICE_MODE:
             program()
         elif is_binary_name(current_dir.selected_filename):
             emulate()
         else:
             current_dir = current_dir.click()
-        
-    last_button = button.value
  
