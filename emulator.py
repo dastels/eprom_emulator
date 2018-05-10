@@ -26,12 +26,14 @@ disable_host_access = True
 
 
 class Emulator:
-
+    """Handle all interaction with the emulator circuit."""
     
     def __init__(self, i2c):
         self.mcp = adafruit_mcp230xx.MCP23017(i2c)
-        self.mcp.iodir = 0x0000
+        self.mcp.iodir = 0x0000           # Make all pins outputs
 
+        # Configure the individual control pins
+        
         self.mode_pin = self.mcp.get_pin(8)
         self.mode_pin.direction = digitalio.Direction.OUTPUT
         self.mode_pin.value = programmer_use
@@ -40,24 +42,24 @@ class Emulator:
         self.write_pin.direction = digitalio.Direction.OUTPUT
         self.write_pin.value = write_disabled
 
-        self.select_pin = self.mcp.get_pin(10)
-        self.select_pin.direction = digitalio.Direction.OUTPUT
-        self.select_pin.value = chip_disabled
+        self.chip_select_pin = self.mcp.get_pin(10)
+        self.chip_select_pin.direction = digitalio.Direction.OUTPUT
+        self.chip_select_pin.value = chip_disabled
         
-        self.clock_pin = self.mcp.get_pin(11)
-        self.clock_pin.direction = digitalio.Direction.OUTPUT
-        self.clock_pin.value = clock_inactive
+        self.address_clock_pin = self.mcp.get_pin(11)
+        self.address_clock_pin.direction = digitalio.Direction.OUTPUT
+        self.address_clock_pin.value = clock_inactive
         
-        self.reset_pin = self.mcp.get_pin(12)
-        self.reset_pin.direction = digitalio.Direction.OUTPUT
-        self.reset_pin.value = reset_inactive
+        self.clock_reset_pin = self.mcp.get_pin(12)
+        self.clock_reset_pin.direction = digitalio.Direction.OUTPUT
+        self.clock_reset_pin.value = reset_inactive
 
         self.led_pin = self.mcp.get_pin(13)
         self.led_pin.direction = digitalio.Direction.OUTPUT
         self.led_pin.value = False
 
         
-    def enter_programmer_mode(self):
+    def enter_program_mode(self):
         self.mode_pin.value = programmer_use
         self.led_pin.value = led_off
 
@@ -73,28 +75,33 @@ class Emulator:
 
         
     def deactivate_ram(self):
-        self.select_pin.value = chip_disabled
+        self.chip_select_pin.value = chip_disabled
 
         
     def activate_ram(self):
-        self.select_pin.value = chip_enabled
+        self.chip_select_pin.value = chip_enabled
 
         
     def reset_address_counter(self):
-        self.reset_pin.value = reset_active
-        self.reset_pin.value = reset_inactive
+        self.clock_reset_pin.value = reset_active
+        self.clock_reset_pin.value = reset_inactive
 
         
     def advance_address_counter(self):
-        self.clock_pin.value = clock_active
-        self.clock_pin.value = clock_inactive
-        
+        self.address_clock_pin.value = clock_active
+        self.address_clock_pin.value = clock_inactive
+
+
+    def output_on_port_a(self, data_byte):
+        """A hack to get around the limitation of the 23017 library to use 8-bit ports"""
+        self.mcp.gpio = (self.mcp.gpio & 0xFF00) | (data_byte & 0x00FF)
+
         
     def load_ram(self, code):
-        self.enter_programmer_mode()
+        self.enter_program_mode()
         self.reset_address_counter()
         for data_byte in code:
-            self.mcp.gpio = (self.mcp.gpio & 0xFF00) | (data_byte & 0x00FF)
+            self.output_on_port_a(data_byte)
             self.activate_ram()
             self.pulse_write()
             self.deactivate_ram()

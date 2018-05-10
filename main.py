@@ -45,7 +45,7 @@ oled.text("Initializing SD", 0, 10)
 oled.show()
 
 #--------------------------------------------------------------------------------
-# Initialize SPI and SD card
+# Initialize SD card
 
 #SD_CS = board.D10
 # Connect to the card and mount the filesystem.
@@ -95,23 +95,27 @@ def load_file(filename):
     return data
 
 
-def enter_run_mode():
-    global current_mode
-    data = load_file(current_dir.selected_filepath())
-    emulator.load_ram(data)
-    emulator.enter_ice_mode()
+def display_emulating_screen():
     oled.fill(0)
     oled.text("Emulating", 0, 0)
-    oled.text(current_dir.selected_filename(), 0, 10)
+    oled.text(current_dir.selected_filename, 0, 10)
     oled.show()
-    current_mode = ICE_MODE
+    
 
-
-def enter_programming_mode():
+def emulate():
     global current_mode
-    emulator.enter_programmer_mode()
+    data = load_file(current_dir.selected_filepath)
+    emulator.load_ram(data)
+    emulator.enter_ice_mode()
+    current_mode = ICE_MODE
+    display_emulating_screen()
+
+
+def program():
+    global current_mode
+    emulator.enter_program_mode()
     current_mode = PROGRAM_MODE
-    current_dir.update()
+    current_dir.force_update()
 
 
 #--------------------------------------------------------------------------------
@@ -122,7 +126,7 @@ last_button = button.value
 rotary_prev_state = [rot_a.value, rot_b.value]
 
 current_dir = DirectoryNode(oled, named = "/sd")
-current_dir.update()
+current_dir.force_update()
 
 while True:
     # reset encoder and wait for the next turn
@@ -134,11 +138,14 @@ while True:
         rotary_curr_state = [rot_a.value, rot_b.value]
  
         if rotary_curr_state != rotary_prev_state:
+            print("Changed")
             if rotary_prev_state == [True, True]:
                 # we caught the first falling edge!
                 if not rotary_curr_state[A_POSITION]:
+                    print("Falling A")
                     falling_edge = A_POSITION
                 elif not rotary_curr_state[B_POSITION]:
+                    print("Falling B")
                     falling_edge = B_POSITION
                 else:
                     # uhh something went deeply wrong, lets start over
@@ -148,8 +155,10 @@ while True:
                 # Ok we hit the final rising edge
                 if not rotary_prev_state[B_POSITION]:
                     rising_edge = B_POSITION
+                    print("Rising B")
                 elif not rotary_prev_state[A_POSITION]:
                     rising_edge = A_POSITION
+                    print("Rising A")
                 else:
                     # uhh something went deeply wrong, lets start over
                     continue
@@ -158,9 +167,11 @@ while True:
                 if (rising_edge == A_POSITION) and (falling_edge == B_POSITION):
                     encoder_counter -= 1
                     encoder_direction = -1
+                    print("%d dec" % encoder_counter)
                 elif (rising_edge == B_POSITION) and (falling_edge == A_POSITION):
                     encoder_counter += 1
                     encoder_direction = 1
+                    print("%d inc" % encoder_counter)
                 else:
                     # (shrug) something didn't work out, oh well!
                     encoder_direction = 0
@@ -184,9 +195,9 @@ while True:
         while not button.value:
             time.sleep(0.01)
         if current_mode == ICE_MODE:
-            enter_programming_mode()
-        elif is_binary_name(current_dir.selected_filename()):
-            enter_run_mode()
+            program()
+        elif is_binary_name(current_dir.selected_filename):
+            emulate()
         else:
             current_dir = current_dir.click()
         
