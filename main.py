@@ -21,7 +21,7 @@ from debouncer import Debouncer
 # Initialize Rotary encoder
 
 # Encoder button is a digital input with pullup on D2
-button = Debouncer(board.D2, digitalio.Pull.UP)
+button = Debouncer(board.D2, digitalio.Pull.UP, 0.01)
  
 # Rotary encoder inputs with pullup on D3 & D4
 rot_a = digitalio.DigitalInOut(board.D4)
@@ -118,72 +118,67 @@ def program():
 
 #--------------------------------------------------------------------------------
 # Main loop
-# get initial/prev state and store at beginning
-
-last_button = button.value
-rotary_prev_state = [rot_a.value, rot_b.value]
 
 current_dir = DirectoryNode(oled, named = "/sd")
 current_dir.force_update()
+rising_edge = falling_edge = UNKNOWN_POSITION
+rotary_prev_state = [rot_a.value, rot_b.value]
 
 while True:
     # reset encoder and wait for the next turn
     encoder_direction = 0
 
-    if current_mode == PROGRAM_MODE:      #Ignore rotation if in ICE mode
-    # See https://learn.adafruit.com/media-dial/code
     # take a 'snapshot' of the rotary encoder state at this time
-        rotary_curr_state = [rot_a.value, rot_b.value]
+    rotary_curr_state = [rot_a.value, rot_b.value]
+        
+    # See https://learn.adafruit.com/media-dial/code
+    if rotary_curr_state != rotary_prev_state:
+        print("Was: {}".format(rotary_prev_state))
+        print("Now: {}".format(rotary_curr_state))
+        if rotary_prev_state == [True, True]:
+            if not rotary_curr_state[A_POSITION]:
+                print("Falling A")
+                falling_edge = A_POSITION
+            elif not rotary_curr_state[B_POSITION]:
+                print("Falling B")
+                falling_edge = B_POSITION
+            else:
+                continue
+
+        if rotary_curr_state == [True, True]:
+            if not rotary_prev_state[B_POSITION]:
+                rising_edge = B_POSITION
+                print("Rising B")
+            elif not rotary_prev_state[A_POSITION]:
+                rising_edge = A_POSITION
+                print("Rising A")
+            else:
+                continue
  
-        if rotary_curr_state != rotary_prev_state:
-            print("Changed")
-            if rotary_prev_state == [True, True]:
-                # we caught the first falling edge!
-                if not rotary_curr_state[A_POSITION]:
-                    print("Falling A")
-                    falling_edge = A_POSITION
-                elif not rotary_curr_state[B_POSITION]:
-                    print("Falling B")
-                    falling_edge = B_POSITION
-                else:
-                    # uhh something went deeply wrong, lets start over
-                    continue
+            # check first and last edge
+            if (rising_edge == A_POSITION) and (falling_edge == B_POSITION):
+                encoder_counter -= 1
+                encoder_direction = -1
+                print("%d dec" % encoder_counter)
+            elif (rising_edge == B_POSITION) and (falling_edge == A_POSITION):
+                encoder_counter += 1
+                encoder_direction = 1
+                print("%d inc" % encoder_counter)
+            else:
+                # (shrug) something didn't work out, oh well!
+                encoder_direction = 0
  
-            if rotary_curr_state == [True, True]:
-                # Ok we hit the final rising edge
-                if not rotary_prev_state[B_POSITION]:
-                    rising_edge = B_POSITION
-                    print("Rising B")
-                elif not rotary_prev_state[A_POSITION]:
-                    rising_edge = A_POSITION
-                    print("Rising A")
-                else:
-                    # uhh something went deeply wrong, lets start over
-                    continue
- 
-                # check first and last edge
-                if (rising_edge == A_POSITION) and (falling_edge == B_POSITION):
-                    encoder_counter -= 1
-                    encoder_direction = -1
-                    print("%d dec" % encoder_counter)
-                elif (rising_edge == B_POSITION) and (falling_edge == A_POSITION):
-                    encoder_counter += 1
-                    encoder_direction = 1
-                    print("%d inc" % encoder_counter)
-                else:
-                    # (shrug) something didn't work out, oh well!
-                    encoder_direction = 0
- 
-                # reset our edge tracking
-                rising_edge = falling_edge = UNKNOWN_POSITION
- 
+            # reset our edge tracking
+            rising_edge = falling_edge = UNKNOWN_POSITION
+
         rotary_prev_state = rotary_curr_state
- 
-    # Handle encoder rotation
-    if encoder_direction == -1:
-        current_dir.up()
-    elif encoder_direction == 1:
-        current_dir.down()
+
+        # Handle encoder rotation
+    if current_mode == PROGRAM_MODE:      #Ignore rotation if in ICE mode
+        if encoder_direction == -1:
+            current_dir.up()
+        elif encoder_direction == 1:
+            current_dir.down()
 
     # look for the initial edge of the rotary encoder switch press, with debouncing
     button.update()
