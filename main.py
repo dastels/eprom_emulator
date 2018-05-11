@@ -1,11 +1,34 @@
 """
+The MIT License (MIT)
+
+Copyright (c) 2018 Dave Astels
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+
 EPROM emulator UI in CircuitPython.
 Targeted for the SAMD51 boards.
 
 by Dave Astels
 """
 
-import time
 import digitalio
 import board
 import busio
@@ -22,7 +45,7 @@ from debouncer import Debouncer
 
 # Encoder button is a digital input with pullup on D2
 button = Debouncer(board.D2, digitalio.Pull.UP, 0.01)
- 
+
 # Rotary encoder inputs with pullup on D3 & D4
 rot_a = digitalio.DigitalInOut(board.D4)
 rot_a.direction = digitalio.Direction.INPUT
@@ -63,19 +86,18 @@ oled.show()
 
 encoder_counter = 0
 encoder_direction = 0
- 
+
 # constants to help us track what edge is what
 A_POSITION = 0
 B_POSITION = 1
 UNKNOWN_POSITION = -1  # initial state so we know if something went wrong
- 
+
 rising_edge = falling_edge = UNKNOWN_POSITION
 
 PROGRAM_MODE = 0
-ICE_MODE = 1
+EMULATE_MODE = 1
 
 current_mode = PROGRAM_MODE
-
 emulator = Emulator(i2c)
 
 
@@ -98,14 +120,14 @@ def display_emulating_screen():
     oled.text("Emulating", 0, 0)
     oled.text(current_dir.selected_filename, 0, 10)
     oled.show()
-    
+
 
 def emulate():
     global current_mode
     data = load_file(current_dir.selected_filepath)
     emulator.load_ram(data)
-    emulator.enter_ice_mode()
-    current_mode = ICE_MODE
+    emulator.enter_emulate_mode()
+    current_mode = EMULATE_MODE
     display_emulating_screen()
 
 
@@ -119,7 +141,7 @@ def program():
 #--------------------------------------------------------------------------------
 # Main loop
 
-current_dir = DirectoryNode(oled, named = "/sd")
+current_dir = DirectoryNode(oled, name="/sd")
 current_dir.force_update()
 rising_edge = falling_edge = UNKNOWN_POSITION
 rotary_prev_state = [rot_a.value, rot_b.value]
@@ -130,7 +152,7 @@ while True:
 
     # take a 'snapshot' of the rotary encoder state at this time
     rotary_curr_state = [rot_a.value, rot_b.value]
-        
+
     # See https://learn.adafruit.com/media-dial/code
     if rotary_curr_state != rotary_prev_state:
         print("Was: {}".format(rotary_prev_state))
@@ -154,7 +176,7 @@ while True:
                 print("Rising A")
             else:
                 continue
- 
+
             # check first and last edge
             if (rising_edge == A_POSITION) and (falling_edge == B_POSITION):
                 encoder_counter -= 1
@@ -167,26 +189,25 @@ while True:
             else:
                 # (shrug) something didn't work out, oh well!
                 encoder_direction = 0
- 
+
             # reset our edge tracking
             rising_edge = falling_edge = UNKNOWN_POSITION
 
         rotary_prev_state = rotary_curr_state
 
         # Handle encoder rotation
-    if current_mode == PROGRAM_MODE:      #Ignore rotation if in ICE mode
+    if current_mode == PROGRAM_MODE:      #Ignore rotation if in EMULATE mode
         if encoder_direction == -1:
             current_dir.up()
         elif encoder_direction == 1:
             current_dir.down()
 
-    # look for the initial edge of the rotary encoder switch press, with debouncing
+    # look for a press of the rotary encoder switch press, with debouncing
     button.update()
     if button.fell:
-        if current_mode == ICE_MODE:
+        if current_mode == EMULATE_MODE:
             program()
         elif is_binary_name(current_dir.selected_filename):
             emulate()
         else:
             current_dir = current_dir.click()
- 

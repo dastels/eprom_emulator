@@ -1,7 +1,35 @@
-import digitalio
-import time
+"""
+The MIT License (MIT)
 
-class Debouncer:
+Copyright (c) 2018 Dave Astels
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+Debounce an input pin.
+"""
+
+import time
+import digitalio
+
+class Debouncer(object):
+    """Debounce an input pin"""
 
     DEBOUNCED_STATE = 0x01
     UNSTABLE_STATE = 0x02
@@ -22,7 +50,7 @@ class Debouncer:
         if self.pin.value:
             self.__set_state(Debouncer.DEBOUNCED_STATE | Debouncer.UNSTABLE_STATE)
         self.previous_time = 0
-        if interval == None:
+        if interval is None:
             self.interval = 0.010
         else:
             self.interval = interval
@@ -42,9 +70,10 @@ class Debouncer:
 
     def __get_state(self, bits):
         return (self.state & bits) != 0
-    
-    
+
+
     def update(self):
+        """Update the debouncer state. Must be called before using any of the properties below"""
         self.__unset_state(Debouncer.CHANGED_STATE)
         current_state = self.pin.value
         if current_state != self.__get_state(Debouncer.UNSTABLE_STATE):
@@ -67,11 +96,10 @@ class Debouncer:
     @property
     def rose(self):
         """Return whether the debounced input went from low to high at the most recent update."""
-        return self.__get_state(Debouncer.DEBOUNCED_STATE) and self.__get_state(Debouncer.CHANGED_STATE)
+        return self.__get_state(self.DEBOUNCED_STATE) and self.__get_state(self.CHANGED_STATE)
 
 
     @property
     def fell(self):
         """Return whether the debounced input went from high to low at the most recent update."""
-        return (not self.__get_state(Debouncer.DEBOUNCED_STATE)) and self.__get_state(Debouncer.CHANGED_STATE)
-    
+        return (not self.__get_state(self.DEBOUNCED_STATE)) and self.__get_state(self.CHANGED_STATE)
